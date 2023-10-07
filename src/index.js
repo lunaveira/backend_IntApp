@@ -214,7 +214,7 @@ app.put('/api/usuarios/:cn', async (req, res) => {
       new ldap.Change({
         operation: 'replace',
         modification: new ldap.Attribute({
-          type: 'cn',
+          type: 'givenName',
           vals: [name],
         }),
       }),
@@ -255,6 +255,8 @@ app.put('/api/usuarios/:cn', async (req, res) => {
       }),
     ];
 
+    console.log('Contenido de modifyChanges:', modifyChanges);
+
     ldapClient.modify(`cn=${cn},ou=users,dc=deliverar,dc=com`, modifyChanges, (modifyError) => {
       if (modifyError) {
         console.error('Error al modificar usuario en el servidor LDAP:', modifyError);
@@ -267,9 +269,6 @@ app.put('/api/usuarios/:cn', async (req, res) => {
     });
   });
 });
-
-
-
 
 
 async function searchUsuariosPorCN(cn) {
