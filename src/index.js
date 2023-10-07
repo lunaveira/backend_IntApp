@@ -316,6 +316,86 @@ async function searchUsuariosPorCN(cn) {
   });
 }
 
+app.get('/api/Login', (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'Str0ngLd4p5Pwd';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+    const baseDN = 'ou=users,dc=deliverar,dc=com';
+    const cn = req.query.cn; 
+    const dn = "cn=" + cn + ",ou=users,dc=deliverar,dc=com";
+    const pass = req.query.pass;
+    console.log(cn);
+    console.log(dn);
+    ldapClient.bind(dn, pass, (err) => {
+      if (err) {
+        console.error('Error de autenticación:', err);
+        res.status(500).send('Credenciales Invalidas');
+        return;
+      }
+          console.log('Autenticación exitosa');
+          ldapClient.unbind();
+          res.status(200).send('ok');
+    })
+  });
+});
+
+app.put('/api/ChangePassword', (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'Str0ngLd4p5Pwd';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+    const baseDN = 'ou=users,dc=deliverar,dc=com';
+    const cn = req.query.cn; 
+    const dn = "cn=" + cn + ",ou=users,dc=deliverar,dc=com";
+    const newPass = req.query.pass;
+    console.log(cn);
+    console.log(dn);
+
+    const change = new ldap.Change({
+      operation: 'replace',
+      modification: {
+        type: 'userPassword',
+        vals: [newPass],
+      },
+    })
+
+    ldapClient.modify(dn, change, (modifyError) => {
+      if (modifyError) {
+        console.error('Error al cambiar la contraseña:', modifyError);
+        return;
+      }  
+      console.log('Contraseña cambiada exitosamente');
+  
+      // Desconexión del servidor LDAP
+      ldapClient.unbind();
+    });
+      ldapClient.unbind();
+    });
+});
+
 
 
 const port= process.env.port || 80
