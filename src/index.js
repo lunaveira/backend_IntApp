@@ -271,6 +271,187 @@ app.put('/api/usuarios/:cn', async (req, res) => {
 });
 
 
+app.get('/api/LoginUid', async (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'Str0ngLd4p5Pwd';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    
+
+    const uid = req.query.uid;
+    const pass = req.query.pass;
+    console.log(uid);
+      try {
+      const usuarioDN = await searchUsuariosPorUid(uid);
+      console.log('DN del usuario:', usuarioDN);
+
+      ldapClient.bind(usuarioDN, pass, (err) => {
+        if (err) {
+          console.error('Error de autenticación:', err);
+          res.status(500).send('Credenciales Inválidas');
+          return;
+        }
+        console.log('Autenticación exitosa');
+        ldapClient.unbind();
+        res.status(200).send('ok');
+      });
+    } catch (searchError) {
+      console.error('Error en la búsqueda LDAP:', searchError);
+      res.status(500).send('No se encontró el usuario en e LDAP');
+    }
+  });
+});
+
+
+
+app.get('/api/Login', (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'Str0ngLd4p5Pwd';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    
+
+    const baseDN = 'ou=users,dc=deliverar,dc=com';
+    const cn = req.query.cn; 
+    const dn = "cn=" + cn + ",ou=users,dc=deliverar,dc=com";
+    const pass = req.query.pass;
+    console.log(cn);
+    console.log(dn);
+    
+    ldapClient.bind(dn, pass, (err) => {
+      if (err) {
+        console.error('Error de autenticación:', err);
+        res.status(500).send('Credenciales Invalidas');
+        return;
+      }
+          console.log('Autenticación exitosa');
+          ldapClient.unbind();
+          res.status(200).send('ok');
+    })
+  });
+});
+
+app.put('/api/ChangePassword', async(req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'Str0ngLd4p5Pwd';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const uid = req.query.uid;
+    console.log(uid);
+    const newPass = req.query.pass;
+    console.log(newPass);
+    try {
+      const usuarioDN = await searchUsuariosPorUid(uid);
+      console.log('DN del usuario:', usuarioDN);
+      const change = new ldap.Change({
+        operation: 'replace',
+          modification: new ldap.Attribute({
+            type: 'userPassword',
+            vals: [newPass],
+          }),
+      });
+  
+      ldapClient.modify(usuarioDN, change, (modifyError) => {
+        if (modifyError) {
+          console.error('Error al cambiar la contraseña:', modifyError);
+          // Asegúrate de manejar el error de cambio de contraseña de manera adecuada
+          res.status(500).send('Error al cambiar la contraseña');
+          return;
+        }  
+        console.log('Contraseña cambiada exitosamente');
+    
+        // Desconexión del servidor LDAP
+        ldapClient.unbind();
+        res.status(200).send('Contraseña cambiada exitosamente');
+      });
+    } catch (searchError) {
+      console.error('Error en la búsqueda LDAP:', searchError);
+      res.status(500).send('No se encontró el usuario en e LDAP');
+    }
+    // Configurar la modificación de la contraseña
+
+  });
+});
+
+app.get('/api/BuscarUsuariosPorUid', (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'Str0ngLd4p5Pwd';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+    const baseDN = 'ou=users,dc=deliverar,dc=com';
+    const uid = req.query.uid; 
+    const searchOptions = {
+      scope: 'one',
+      filter: `(uid=${uid})`, 
+    };
+
+    ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
+      if (searchError) {
+        console.error('Error en la búsqueda LDAP:', searchError);
+        res.status(500).send('Error en la búsqueda LDAP');
+        return;
+      }
+
+      const usuariosCN = [];
+
+      searchResponse.on('searchEntry', (entry) => {
+        const usuarioCN = entry.pojo;
+        usuariosCN.push(usuarioCN);
+      });
+
+      searchResponse.on('end', () => {
+        console.log('Búsqueda LDAP completada. Total de usuarios encontrados:', usuariosCN.length);
+
+        ldapClient.unbind();
+
+        res.status(200).json(usuariosCN);
+      });
+    });
+  });
+});
+
+
 async function searchUsuariosPorCN(cn) {
   return new Promise((resolve, reject) => {
     const ldapServerUrl = 'ldap://34.231.51.201:389/';
@@ -316,85 +497,57 @@ async function searchUsuariosPorCN(cn) {
   });
 }
 
-app.get('/api/Login', (req, res) => {
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
 
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-  });
 
-  ldapClient.bind(adminDN, adminPassword, (bindError) => {
-    if (bindError) {
-      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
-      res.status(500).send('Error al autenticarse en el servidor LDAP');
-      return;
-    }
+function searchUsuariosPorUid(uid) {
+  return new Promise((resolve, reject) => {
+    const ldapServerUrl = 'ldap://34.231.51.201:389/';
+    const adminDN = 'cn=admin,dc=deliverar,dc=com';
+    const adminPassword = 'Str0ngLd4p5Pwd';
 
-    const baseDN = 'ou=users,dc=deliverar,dc=com';
-    const cn = req.query.cn; 
-    const dn = "cn=" + cn + ",ou=users,dc=deliverar,dc=com";
-    const pass = req.query.pass;
-    console.log(cn);
-    console.log(dn);
-    ldapClient.bind(dn, pass, (err) => {
-      if (err) {
-        console.error('Error de autenticación:', err);
-        res.status(500).send('Credenciales Invalidas');
-        return;
+    const ldapClient = ldap.createClient({
+      url: ldapServerUrl,
+    });
+
+    ldapClient.bind(adminDN, adminPassword, (bindError) => {
+      if (bindError) {
+        console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+        reject(bindError);
+      } else {
+        const baseDN = 'ou=users,dc=deliverar,dc=com';
+        const searchOptions = {
+          scope: 'one',
+          filter: `(uid=${uid})`,
+        };
+
+        let usuarioEncontrado = false; // Bandera para rastrear si se encontró un usuario
+
+        ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
+          if (searchError) {
+            console.error('Error en la búsqueda LDAP:', searchError);
+            reject(searchError);
+          }
+
+          searchResponse.on('searchEntry', (entry) => {
+            const usuarioDN = entry.dn.toString(); // Obtiene el DN del usuario
+            resolve(usuarioDN);
+            usuarioEncontrado = true; // Marca que se encontró un usuario
+          });
+
+          searchResponse.on('end', () => {
+            console.log('Búsqueda LDAP completada');
+            ldapClient.unbind();
+
+            if (!usuarioEncontrado) {
+              reject(new Error(`No se encontró un usuario con el UID: ${uid}`));
+            }
+          });
+        });
       }
-          console.log('Autenticación exitosa');
-          ldapClient.unbind();
-          res.status(200).send('ok');
-    })
-  });
-});
-
-app.put('/api/ChangePassword', (req, res) => {
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
-
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-  });
-
-  ldapClient.bind(adminDN, adminPassword, (bindError) => {
-    if (bindError) {
-      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
-      res.status(500).send('Error al autenticarse en el servidor LDAP');
-      return;
-    }
-
-    const baseDN = 'ou=users,dc=deliverar,dc=com';
-    const cn = req.query.cn; 
-    const dn = "cn=" + cn + ",ou=users,dc=deliverar,dc=com";
-    const newPass = req.query.pass;
-    console.log(cn);
-    console.log(dn);
-
-    const change = new ldap.Change({
-      operation: 'replace',
-      modification: {
-        type: 'userPassword',
-        vals: [newPass],
-      },
-    })
-
-    ldapClient.modify(dn, change, (modifyError) => {
-      if (modifyError) {
-        console.error('Error al cambiar la contraseña:', modifyError);
-        return;
-      }  
-      console.log('Contraseña cambiada exitosamente');
-  
-      // Desconexión del servidor LDAP
-      ldapClient.unbind();
     });
-      ldapClient.unbind();
-    });
-});
+  });
+}
+
 
 
 
