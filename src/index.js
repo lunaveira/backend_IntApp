@@ -377,7 +377,7 @@ app.put('/api/ChangePassword', async(req, res) => {
         operation: 'replace',
           modification: new ldap.Attribute({
             type: 'userPassword',
-            vals: [newPass],
+            values: [newPass],
           }),
       });
   
@@ -393,6 +393,62 @@ app.put('/api/ChangePassword', async(req, res) => {
         // Desconexión del servidor LDAP
         ldapClient.unbind();
         res.status(200).send('Contraseña cambiada exitosamente');
+      });
+    } catch (searchError) {
+      console.error('Error en la búsqueda LDAP:', searchError);
+      res.status(500).send('No se encontró el usuario en e LDAP');
+    }
+    // Configurar la modificación de la contraseña
+
+  });
+});
+
+
+
+
+
+app.put('/api/GenerarOTP', async(req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const uid = req.query.uid;
+    console.log(uid);
+
+    try {
+      const codigo = CodigoRandom();
+      const usuarioDN = await searchUsuariosPorUid(uid);
+      console.log('DN del usuario:', usuarioDN);
+      const change = new ldap.Change({
+        operation: 'replace',
+          modification: new ldap.Attribute({
+            type: 'fax',
+            values: [codigo],
+          }),
+      });
+  
+      ldapClient.modify(usuarioDN, change, (modifyError) => {
+        if (modifyError) {
+          console.error('Error cargar el OTP:', modifyError);
+          // Asegúrate de manejar el error de cambio de contraseña de manera adecuada
+          res.status(500).send('Error al cargar el OTP');
+          return;
+        }  
+        console.log('OTP generado exitosamente');
+    
+        // Desconexión del servidor LDAP
+        ldapClient.unbind();
+        res.status(200).json(codigo);
       });
     } catch (searchError) {
       console.error('Error en la búsqueda LDAP:', searchError);
@@ -580,7 +636,11 @@ function searchUsuariosPorUid(uid) {
   });
 }
 
-
+function CodigoRandom() {
+  const min = 100000; // Valor mínimo de 6 dígitos
+  const max = 999999; // Valor máximo de 6 dígitos
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
 
 const port= process.env.port || 80
