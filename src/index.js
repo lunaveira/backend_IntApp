@@ -451,6 +451,38 @@ app.get('/api/BuscarUsuariosPorUid', (req, res) => {
   });
 });
 
+app.get('/api/ValidarEmail', (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const nombre = req.query.name; 
+    const existingUsers = await searchUsuariosPorUid(nombre);
+
+    if (existingUsers.length > 0) {
+      return res.status(200).json(existingUsers);
+     /* return res.status(500).send('El usuario no existe.');*/
+     /*VER QUE ES NECESARIO QUE DEVUELVA*/
+
+    }else{
+      res.status(500).send('El usuario no existe.');
+    }
+    ldapClient.unbind();
+
+      });
+    });
+
+
 
 async function searchUsuariosPorCN(cn) {
   return new Promise((resolve, reject) => {
@@ -539,7 +571,7 @@ function searchUsuariosPorUid(uid) {
             ldapClient.unbind();
 
             if (!usuarioEncontrado) {
-              reject(new Error(`No se encontró un usuario con el UID: ${uid}`));
+              resolve(new Error(`No se encontró un usuario con el UID: ${uid}`));
             }
           });
         });
