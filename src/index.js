@@ -37,7 +37,7 @@ app.post('/api/usuarios', async (req, res) => {
 
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -84,7 +84,7 @@ app.post('/api/usuarios', async (req, res) => {
 app.get('/api/GetAllUsuarios', (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   
   const ldapClient = ldap.createClient({
@@ -137,7 +137,7 @@ app.get('/api/GetAllUsuarios', (req, res) => {
 app.get('/api/BuscarUsuariosPorCN', (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -197,7 +197,7 @@ app.put('/api/usuarios/:cn', async (req, res) => {
 
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -274,7 +274,7 @@ app.put('/api/usuarios/:cn', async (req, res) => {
 app.get('/api/LoginUid', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -317,7 +317,7 @@ app.get('/api/LoginUid', async (req, res) => {
 app.get('/api/Login', (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -354,7 +354,7 @@ app.get('/api/Login', (req, res) => {
 app.put('/api/ChangePassword', async(req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -406,7 +406,7 @@ app.put('/api/ChangePassword', async(req, res) => {
 app.get('/api/BuscarUsuariosPorUid', (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'Str0ngLd4p5Pwd';
+  const adminPassword = 'admin';
 
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
@@ -456,7 +456,7 @@ async function searchUsuariosPorCN(cn) {
   return new Promise((resolve, reject) => {
     const ldapServerUrl = 'ldap://34.231.51.201:389/';
     const adminDN = 'cn=admin,dc=deliverar,dc=com';
-    const adminPassword = 'Str0ngLd4p5Pwd';
+    const adminPassword = 'admin';
 
     const ldapClient = ldap.createClient({
       url: ldapServerUrl,
@@ -503,7 +503,7 @@ function searchUsuariosPorUid(uid) {
   return new Promise((resolve, reject) => {
     const ldapServerUrl = 'ldap://34.231.51.201:389/';
     const adminDN = 'cn=admin,dc=deliverar,dc=com';
-    const adminPassword = 'Str0ngLd4p5Pwd';
+    const adminPassword = 'admin';
 
     const ldapClient = ldap.createClient({
       url: ldapServerUrl,
