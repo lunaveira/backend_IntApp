@@ -215,42 +215,42 @@ app.put('/api/usuarios/:cn', async (req, res) => {
         operation: 'replace',
         modification: new ldap.Attribute({
           type: 'givenName',
-          vals: [name],
+          values: [name],
         }),
       }),
       new ldap.Change({
         operation: 'replace',
         modification: new ldap.Attribute({
           type: 'sn',
-          vals: [lastname],
+          values: [lastname],
         }),
       }),
       new ldap.Change({
         operation: 'replace',
         modification: new ldap.Attribute({
           type: 'uid',
-          vals: [email],
+          values: [email],
         }),
       }),
       new ldap.Change({
         operation: 'replace',
         modification: new ldap.Attribute({
           type: 'userPassword',
-          vals: [password],
+          values: [password],
         }),
       }),
       new ldap.Change({
         operation: 'replace',
         modification: new ldap.Attribute({
           type: 'postalCode',
-          vals: [birthDate],
+          values: [birthDate],
         }),
       }),
       new ldap.Change({
         operation: 'replace',
         modification: new ldap.Attribute({
           type: 'carLicense',
-          vals: [dni],
+          values: [dni],
         }),
       }),
     ];
@@ -403,7 +403,47 @@ app.put('/api/ChangePassword', async(req, res) => {
   });
 });
 
+app.get('/api/ValidarOTP', async (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
 
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const uid = req.query.uid;
+    const otp = req.query.otp;
+    console.log(uid);
+    const usuarioDN = await searchUsuariosPorUid(uid);
+    console.log(usuarioDN);
+
+    // Obtener el valor del atributo "EmployeeNumber" del usuario
+    ldapClient.compare(usuarioDN, 'employeeNumber', otp, (compareError, matched) => {
+      if (compareError) {
+        console.error('Error al comparar el atributo "EmployeeNumber(OTP)":', compareError);
+        res.status(500).send('Error al validar el OTP');
+        return;
+      }
+
+      if (matched) {
+        console.log('OTP IGUALES');
+        res.status(200).send('OTP IGUALES');
+      } else {
+        console.log('NO SON IGUALES');
+        res.status(400).send('NO SON IGUALES');
+      }
+
+      ldapClient.unbind();
+    });
+  });
+});
 
 
 
@@ -432,7 +472,7 @@ app.put('/api/GenerarOTP', async(req, res) => {
       const change = new ldap.Change({
         operation: 'replace',
           modification: new ldap.Attribute({
-            type: 'fax',
+            type: 'employeeNumber',
             values: [codigo],
           }),
       });
