@@ -482,11 +482,12 @@ app.put('/api/GenerarOTP', async(req, res) => {
       return;
     }
     const uid = req.query.uid;
+    const givenName = req.query.name;
     console.log(uid);
 
     try {
       const codigo = CodigoRandom();
-      sendEmail(codigo).catch(console.error);
+      sendEmail(codigo, uid, givenName).catch(console.error);
       const usuarioDN = await searchUsuariosPorUid(uid);
       console.log('DN del usuario:', usuarioDN);
       const change = new ldap.Change({
@@ -645,7 +646,7 @@ async function searchUsuariosPorCN(cn) {
   });
 }
 
-async function sendEmail(otp) {
+async function sendEmail(otp, uid, givenName) {
   // Configura el transporte de correo con Ethereal
   const testAccount = await nodemailer.createTestAccount();
   const transporter = nodemailer.createTransport({
@@ -661,9 +662,34 @@ async function sendEmail(otp) {
   // Define el correo electrónico
   const mailOptions = {
     from: "remite@example.com", // La dirección de correo electrónico del remitente
-    to: "destinatario@example.com", // La dirección de correo electrónico del destinatario
-    subject: "Asunto del correo",
-    text: `Tu código OTP es: ${otp}`, // Puedes cambiar a HTML si necesitas contenido HTML
+    to: `${uid}`, // La dirección de correo electrónico del destinatario
+    subject: "Deliverar",
+    html: `
+    <html>
+      <head>
+        <style>
+          /* Estilos para el branding */
+          .header {
+            background-color: #0073e6; /* Azul */
+            color: #ffffff; /* Blanco */
+            padding: 10px;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Deliverar</h1>
+        </div>
+        <p>Estimado/a ${givenName},</p>
+        <p>Le informamos que hemos recibido una solicitud de cambio de contraseña para su cuenta en Deliverar.</p>
+        <p>Si usted no ha solicitado este cambio, por favor póngase en contacto con nuestro servicio de asistencia técnica.</p>
+        <p>Para continuar con el proceso de cambio de contraseña, utilice el siguiente código OTP: <strong>${otp}</strong></p>
+        <p>Gracias por confiar en Deliverar.</p>
+        <p>Atentamente,<br>El Equipo de Soporte de Deliverar</p>
+      </body>
+    </html>
+  `, // Puedes cambiar a HTML si necesitas contenido HTML
   };
 
   // Envía el correo electrónico
