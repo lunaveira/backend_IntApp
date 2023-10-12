@@ -403,6 +403,65 @@ app.put('/api/ChangePassword', async(req, res) => {
   });
 });
 
+
+
+/*
+
+app.get('/api/ValidarOTP', async (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const uid = req.query.uid;
+    const otp = req.query.otp;
+    console.log(uid);
+    const usuarioDN = await searchUsuariosPorUid(uid);
+    console.log(usuarioDN);
+
+    // Obtener el valor del atributo "EmployeeNumber" del usuario
+    ldapClient.compare(usuarioDN, 'employeeNumber', otp, (compareError, matched) => {
+      if (matched) {
+        console.log('OTP IGUALES');
+        res.status(200).send('SON IGUALES');
+        ldapClient.modify(usuarioDN, new ldap.Change({
+          operation: 'replace',
+          modification: new ldap.Attribute({
+            type: 'employeeNumber',
+            vals: [],
+          }),
+        }), (modifyError) => {
+          if (modifyError) {
+            console.error('Error al borrar el atributo "EmployeeNumber":', modifyError);
+            return;
+          }
+
+          console.log('Atributo "EmployeeNumber" borrado exitosamente');
+        });
+      } else {
+        console.log('NO SON IGUALES');
+        res.status(400).send('NO SON IGUALES');
+      }
+
+      ldapClient.unbind();
+    });
+  });
+});
+
+
+/*----------------------------------------------------------------------------------------------*/
+
+
+
 app.get('/api/ValidarOTP', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
@@ -429,22 +488,39 @@ app.get('/api/ValidarOTP', async (req, res) => {
       if (compareError) {
         console.error('Error al comparar el atributo "EmployeeNumber(OTP)":', compareError);
         res.status(500).send('Error al validar el OTP');
+        ldapClient.unbind(); // Asegurar que se cierre la conexión en caso de error
         return;
       }
 
       if (matched) {
         console.log('OTP IGUALES');
-        res.status(200).send('OTP IGUALES');
+        ldapClient.modify(usuarioDN, new ldap.Change({
+          operation: 'replace',
+          modification: new ldap.Attribute({
+            type: 'employeeNumber',
+            values: [],
+          }),
+        }), (modifyError) => {
+          if (modifyError) {
+            console.error('Error al borrar el atributo "EmployeeNumber":', modifyError);
+            res.status(500).send('Error al borrar el atributo "EmployeeNumber"');
+          } else {
+            console.log('Atributo "EmployeeNumber" borrado exitosamente');
+            res.status(200).send('OTP IGUALES');
+          }
+          ldapClient.unbind(); // Cerrar la conexión después de modificar el atributo
+        });
       } else {
         console.log('NO SON IGUALES');
         res.status(400).send('NO SON IGUALES');
+        ldapClient.unbind(); // Cerrar la conexión en caso de no coincidencia
       }
-
-      ldapClient.unbind();
     });
   });
 });
 
+
+/*--------------------------------------------------------------------*/
 
 
 app.put('/api/GenerarOTP', async(req, res) => {
