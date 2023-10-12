@@ -1,5 +1,6 @@
 const express = require('express');
 const ldap = require('ldapjs'); 
+const nodemailer = require("nodemailer");
 //const mysql = require('mysql');
 const app = express();
 
@@ -473,6 +474,7 @@ app.put('/api/GenerarOTP', async(req, res) => {
     url: ldapServerUrl,
   });
 
+
   ldapClient.bind(adminDN, adminPassword, async (bindError) => {
     if (bindError) {
       console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
@@ -484,6 +486,7 @@ app.put('/api/GenerarOTP', async(req, res) => {
 
     try {
       const codigo = CodigoRandom();
+      sendEmail(codigo).catch(console.error);
       const usuarioDN = await searchUsuariosPorUid(uid);
       console.log('DN del usuario:', usuarioDN);
       const change = new ldap.Change({
@@ -642,7 +645,32 @@ async function searchUsuariosPorCN(cn) {
   });
 }
 
+async function sendEmail(otp) {
+  // Configura el transporte de correo con Ethereal
+  const testAccount = await nodemailer.createTestAccount();
+  const transporter = nodemailer.createTransport({
+    host: "smtp.ethereal.email",
+    port: 587,
+    secure: false,
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass,
+    },
+  });
 
+  // Define el correo electrónico
+  const mailOptions = {
+    from: "remite@example.com", // La dirección de correo electrónico del remitente
+    to: "destinatario@example.com", // La dirección de correo electrónico del destinatario
+    subject: "Asunto del correo",
+    text: `Tu código OTP es: ${otp}`, // Puedes cambiar a HTML si necesitas contenido HTML
+  };
+
+  // Envía el correo electrónico
+  const info = await transporter.sendMail(mailOptions);
+
+  console.log("Correo electrónico enviado con éxito. URL de vista previa:", nodemailer.getTestMessageUrl(info));
+}
 
 function searchUsuariosPorUid(uid) {
   return new Promise((resolve, reject) => {
