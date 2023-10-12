@@ -1,5 +1,5 @@
 const express = require('express');
-const ldap = require('ldapjs'); 
+const ldap = require('ldapjs');
 const nodemailer = require("nodemailer");
 //const mysql = require('mysql');
 const app = express();
@@ -8,8 +8,8 @@ app.use(express.json());
 
 
 
-app.get('/', (req, res)=>{
-       res.send("Node JS api")
+app.get('/', (req, res) => {
+  res.send("Node JS api")
 })
 
 
@@ -87,12 +87,12 @@ app.get('/api/GetAllUsuarios', (req, res) => {
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
   const adminPassword = 'admin';
 
-  
+
   const ldapClient = ldap.createClient({
     url: ldapServerUrl,
   });
 
- 
+
   ldapClient.bind(adminDN, adminPassword, (bindError) => {
     if (bindError) {
       console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
@@ -100,7 +100,7 @@ app.get('/api/GetAllUsuarios', (req, res) => {
       return;
     }
 
-    
+
     const baseDN = 'ou=users,dc=deliverar,dc=com';
     const searchOptions = {
       scope: 'one',
@@ -115,7 +115,7 @@ app.get('/api/GetAllUsuarios', (req, res) => {
       }
 
       const usuarios = [];
-      
+
       searchResponse.on('searchEntry', (entry) => {
         const usuario = entry.pojo;
         usuarios.push(usuario);
@@ -125,10 +125,10 @@ app.get('/api/GetAllUsuarios', (req, res) => {
       searchResponse.on('end', () => {
         console.log('Búsqueda LDAP completada. Total de usuarios encontrados:', usuarios.length);
 
-        
+
         ldapClient.unbind();
 
-        
+
         res.status(200).json(usuarios);
       });
     });
@@ -152,10 +152,10 @@ app.get('/api/BuscarUsuariosPorCN', (req, res) => {
     }
 
     const baseDN = 'ou=users,dc=deliverar,dc=com';
-    const cn = req.query.cn; 
+    const cn = req.query.cn;
     const searchOptions = {
       scope: 'one',
-      filter: `(cn=${cn})`, 
+      filter: `(cn=${cn})`,
     };
 
     ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
@@ -184,7 +184,7 @@ app.get('/api/BuscarUsuariosPorCN', (req, res) => {
 });
 
 app.put('/api/usuarios/:cn', async (req, res) => {
-  const cn = req.params.cn; 
+  const cn = req.params.cn;
   const {
     name,
     lastname,
@@ -287,12 +287,12 @@ app.get('/api/LoginUid', async (req, res) => {
       res.status(500).send('Error al autenticarse en el servidor LDAP');
       return;
     }
-    
+
 
     const uid = req.query.uid;
     const pass = req.query.pass;
     console.log(uid);
-      try {
+    try {
       const usuarioDN = await searchUsuariosPorUid(uid);
       console.log('DN del usuario:', usuarioDN);
 
@@ -330,29 +330,29 @@ app.get('/api/Login', (req, res) => {
       res.status(500).send('Error al autenticarse en el servidor LDAP');
       return;
     }
-    
+
 
     const baseDN = 'ou=users,dc=deliverar,dc=com';
-    const cn = req.query.cn; 
+    const cn = req.query.cn;
     const dn = "cn=" + cn + ",ou=users,dc=deliverar,dc=com";
     const pass = req.query.pass;
     console.log(cn);
     console.log(dn);
-    
+
     ldapClient.bind(dn, pass, (err) => {
       if (err) {
         console.error('Error de autenticación:', err);
         res.status(500).send('Credenciales Invalidas');
         return;
       }
-          console.log('Autenticación exitosa');
-          ldapClient.unbind();
-          res.status(200).send('ok');
+      console.log('Autenticación exitosa');
+      ldapClient.unbind();
+      res.status(200).send('ok');
     })
   });
 });
 
-app.put('/api/ChangePassword', async(req, res) => {
+app.put('/api/ChangePassword', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
   const adminPassword = 'admin';
@@ -376,21 +376,21 @@ app.put('/api/ChangePassword', async(req, res) => {
       console.log('DN del usuario:', usuarioDN);
       const change = new ldap.Change({
         operation: 'replace',
-          modification: new ldap.Attribute({
-            type: 'userPassword',
-            values: [newPass],
-          }),
+        modification: new ldap.Attribute({
+          type: 'userPassword',
+          values: [newPass],
+        }),
       });
-  
+
       ldapClient.modify(usuarioDN, change, (modifyError) => {
         if (modifyError) {
           console.error('Error al cambiar la contraseña:', modifyError);
           // Asegúrate de manejar el error de cambio de contraseña de manera adecuada
           res.status(500).send('Error al cambiar la contraseña');
           return;
-        }  
+        }
         console.log('Contraseña cambiada exitosamente');
-    
+
         // Desconexión del servidor LDAP
         ldapClient.unbind();
         res.status(200).send('Contraseña cambiada exitosamente');
@@ -465,7 +465,7 @@ app.get('/api/ValidarOTP', async (req, res) => {
 
 
 
-app.put('/api/GenerarOTP', async(req, res) => {
+app.put('/api/GenerarOTP', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
   const adminPassword = 'admin';
@@ -492,21 +492,21 @@ app.put('/api/GenerarOTP', async(req, res) => {
       console.log('DN del usuario:', usuarioDN);
       const change = new ldap.Change({
         operation: 'replace',
-          modification: new ldap.Attribute({
-            type: 'employeeNumber',
-            values: [codigo],
-          }),
+        modification: new ldap.Attribute({
+          type: 'employeeNumber',
+          values: [codigo],
+        }),
       });
-  
+
       ldapClient.modify(usuarioDN, change, (modifyError) => {
         if (modifyError) {
           console.error('Error cargar el OTP:', modifyError);
           // Asegúrate de manejar el error de cambio de contraseña de manera adecuada
           res.status(500).send('Error al cargar el OTP');
           return;
-        }  
+        }
         console.log('OTP generado exitosamente');
-    
+
         // Desconexión del servidor LDAP
         ldapClient.unbind();
         res.status(200).json(codigo);
@@ -537,10 +537,10 @@ app.get('/api/BuscarUsuariosPorUid', (req, res) => {
     }
 
     const baseDN = 'ou=users,dc=deliverar,dc=com';
-    const uid = req.query.uid; 
+    const uid = req.query.uid;
     const searchOptions = {
       scope: 'one',
-      filter: `(uid=${uid})`, 
+      filter: `(uid=${uid})`,
     };
 
     ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
@@ -583,21 +583,117 @@ app.get('/api/ValidarEmail', (req, res) => {
       res.status(500).send('Error al autenticarse en el servidor LDAP');
       return;
     }
-    const nombre = req.query.name; 
+    const nombre = req.query.name;
     const existingUsers = await searchUsuariosPorUid(nombre);
 
     if (existingUsers.length > 0) {
       return res.status(200).json(existingUsers);
-     /* return res.status(500).send('El usuario no existe.');*/
-     /*VER QUE ES NECESARIO QUE DEVUELVA*/
+      /* return res.status(500).send('El usuario no existe.');*/
+      /*VER QUE ES NECESARIO QUE DEVUELVA*/
 
-    }else{
+    } else {
       res.status(500).send('El usuario no existe.');
     }
     ldapClient.unbind();
 
-      });
+  });
+});
+
+
+app.post('/api/grupos', async (req, res) => {
+  const { groupName, description } = req.body;
+
+  if (!groupName) {
+    return res.status(400).send('El nombre del grupo es obligatorio.');
+  }
+
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+    tlsOptions: {},
+    version: 3, 
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+    const nuevoGrupoLDAP = {
+      objectClass: ['top', 'groupOfNames'],
+      cn: groupName,
+      description: description || '',
+      member: [], 
+    };
+
+    console.log('Datos del grupo a agregar al LDAP:', nuevoGrupoLDAP);
+
+    ldapClient.add(`cn=${groupName},ou=groups,dc=deliverar,dc=com`, nuevoGrupoLDAP, (addError) => {
+      if (addError) {
+        console.error('Error al crear el grupo en el servidor LDAP:', addError);
+        res.status(500).send('Error al crear el grupo en el servidor LDAP');
+      } else {
+        console.log('Grupo creado con éxito en el servidor LDAP');
+        res.status(201).send('Grupo creado con éxito en el servidor LDAP');
+      }
+      ldapClient.unbind();
     });
+  });
+});
+
+
+
+
+app.post('/api/usuarios/:cn/asignar-grupos', async (req, res) => {
+  const cn = req.params.cn;
+  const { groups } = req.body;
+
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+    const userDN = `cn=${cn},ou=users,dc=deliverar,dc=com`;
+
+    // Recorre la lista de grupos y asigna al usuario
+    for (const groupDN of groups) {
+      ldapClient.modify(userDN, [
+        new ldap.Change({
+          operation: 'add',
+          modification: new ldap.Attribute({
+            type: 'member', // Nombre del atributo que relaciona usuarios y grupos
+            vals: [userDN], // Valor que relaciona al usuario con el grupo
+          }),
+        }),
+      ], (modifyError) => {
+        if (modifyError) {
+          console.error(`Error al asignar el usuario al grupo ${groupDN}:`, modifyError);
+        } else {
+          console.log(`Usuario asignado al grupo ${groupDN}`);
+        }
+      });
+    }
+
+    res.status(200).send('Grupos asignados exitosamente');
+    ldapClient.unbind();
+  });
+});
+
 
 
 
@@ -754,8 +850,8 @@ function CodigoRandom() {
 }
 
 
-const port= process.env.port || 80
-app.listen(port,()=> console.log(`Escuchando en puerto ${port}...`))
+const port = process.env.port || 80
+app.listen(port, () => console.log(`Escuchando en puerto ${port}...`))
 
 /*const db = mysql.createConnection({
   host: '127.0.0.1', 
