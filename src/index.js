@@ -13,6 +13,8 @@ app.get('/', (req, res) => {
 })
 
 
+
+
 app.post('/api/usuarios', async (req, res) => {
   const {
     name,
@@ -600,54 +602,6 @@ app.get('/api/ValidarEmail', (req, res) => {
 });
 
 
-app.post('/api/grupos', async (req, res) => {
-  const { groupName, description } = req.body;
-
-  if (!groupName) {
-    return res.status(400).send('El nombre del grupo es obligatorio.');
-  }
-
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'admin';
-
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-    tlsOptions: {},
-    version: 3, 
-  });
-
-  ldapClient.bind(adminDN, adminPassword, (bindError) => {
-    if (bindError) {
-      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
-      res.status(500).send('Error al autenticarse en el servidor LDAP');
-      return;
-    }
-
-    const nuevoGrupoLDAP = {
-      objectClass: ['top', 'groupOfNames'],
-      cn: groupName,
-      description: description || '',
-      member: [], 
-    };
-
-    console.log('Datos del grupo a agregar al LDAP:', nuevoGrupoLDAP);
-
-    ldapClient.add(`cn=${groupName},ou=groups,dc=deliverar,dc=com`, nuevoGrupoLDAP, (addError) => {
-      if (addError) {
-        console.error('Error al crear el grupo en el servidor LDAP:', addError);
-        res.status(500).send('Error al crear el grupo en el servidor LDAP');
-      } else {
-        console.log('Grupo creado con éxito en el servidor LDAP');
-        res.status(201).send('Grupo creado con éxito en el servidor LDAP');
-      }
-      ldapClient.unbind();
-    });
-  });
-});
-
-
-
 
 app.post('/api/usuarios/:cn/asignar-grupos', async (req, res) => {
   const cn = req.params.cn;
@@ -689,10 +643,119 @@ app.post('/api/usuarios/:cn/asignar-grupos', async (req, res) => {
       });
     }
 
+    console.log(`Grupos asignados al usuario ${cn}:`, groups); // Nuevo console.log agregado
+
     res.status(200).send('Grupos asignados exitosamente');
     ldapClient.unbind();
   });
 });
+
+app.post('/api/usuarios/:cn/desasignar-grupos', async (req, res) => {
+  const cn = req.params.cn;
+  const { groups } = req.body;
+
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+    const userDN = `cn=${cn},ou=users,dc=deliverar,dc=com`;
+
+    // Recorre la lista de grupos y desasigna al usuario
+    for (const groupDN of groups) {
+      ldapClient.modify(groupDN, [
+        new ldap.Change({
+          operation: 'delete',
+          modification: new ldap.Attribute({
+            type: 'member', // Nombre del atributo que relaciona usuarios y grupos
+            vals: [userDN], // Valor que se eliminará del grupo
+          }),
+        }),
+      ], (modifyError) => {
+        if (modifyError) {
+          console.error(`Error al desasignar el usuario del grupo ${groupDN}:`, modifyError);
+        } else {
+          console.log(`Usuario desasignado del grupo ${groupDN}`);
+        }
+      });
+    }
+
+    res.status(200).send('Grupos desasignados exitosamente');
+    ldapClient.unbind();
+  });
+});
+
+
+// Función para listar grupos en LDAP
+async function listarGrupos() {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      throw bindError; // Manejar el error de autenticación
+    } else {
+      console.log('Conexión exitosa al servidor LDAP');
+    }
+
+    const baseDN = 'ou=groups,dc=deliverar,dc=com'; // Reemplaza con tu DN de grupos
+    const searchOptions = {
+      scope: 'one',
+      filter: '(objectClass=posixGroup)', // Filtro para grupos (ajusta según tu LDAP)
+    };
+
+    return new Promise((resolve, reject) => {
+      ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
+        if (searchError) {
+          console.error('Error en la búsqueda LDAP:', searchError);
+          ldapClient.unbind();
+          reject(searchError); // Manejar el error de búsqueda
+        }
+
+        const grupos = [];
+
+        searchResponse.on('searchEntry', (entry) => {
+          const grupo = entry.object;
+          grupos.push(grupo);
+        });
+
+        searchResponse.on('end', () => {
+          console.log('Búsqueda LDAP completada. Total de grupos encontrados:', grupos.length);
+          ldapClient.unbind();
+          resolve(grupos);
+        });
+      });
+    });
+  });
+}
+
+// Ruta para obtener la lista de grupos
+app.get('/api/listar-grupos', async (req, res) => {
+  try {
+    const grupos = await listarGrupos();
+    res.status(200).json({ grupos });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al listar grupos' });
+  }
+});
+
+
 
 
 
@@ -842,6 +905,8 @@ function searchUsuariosPorUid(uid) {
     });
   });
 }
+
+
 
 function CodigoRandom() {
   const min = 100000; // Valor mínimo de 6 dígitos
