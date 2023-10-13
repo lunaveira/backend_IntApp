@@ -755,6 +755,147 @@ app.get('/api/listar-grupos', async (req, res) => {
   }
 });
 
+/*
+
+// Ruta para obtener la lista de grupos
+app.get('/api/listar-gruposv2', async (req, res) => {
+  try {
+    const grupos = await listarGruposv2();
+    res.status(200).json(grupos);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al listar grupos' });
+  }
+});
+
+
+
+// Función para listar grupos en LDAP
+async function listarGruposv2() {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      throw bindError; // Manejar el error de autenticación
+    } else {
+      console.log('Conexión exitosa al servidor LDAP');
+    }
+
+    const baseDN = 'ou=groups,dc=deliverar,dc=com'; // Reemplaza con tu DN de grupos
+    const searchOptions = {
+      scope: 'one',
+      filter: '(objectClass=posixGroup)', // Filtro para grupos (ajusta según tu LDAP)
+    };
+
+    return new Promise((resolve, reject) => {
+      ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
+        if (searchError) {
+          console.error('Error en la búsqueda LDAP:', searchError);
+          ldapClient.unbind();
+          reject(searchError); // Manejar el error de búsqueda
+        }
+
+        const grupos = [];
+
+        searchResponse.on('searchEntry', (entry) => {
+          const grupo = entry.pojo;
+          grupos.push(grupo);
+        });
+
+        searchResponse.on('end', () => {
+          console.log('Búsqueda LDAP completada. Total de grupos encontrados:', grupos.length);
+          resolve(grupos);
+          ldapClient.unbind();
+
+        });
+      });
+    });
+  });
+}
+
+*/
+
+
+
+
+
+
+app.get("/api/grupos-ldap", (req, res) => {
+  // Configura los detalles de conexión al servidor LDAP
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+  // Conecta al servidor LDAP
+  ldapClient.bind(adminDN, adminPassword, (err) => {
+    if (err) {
+      console.error("Error al conectar al servidor LDAP:", err);
+      return res.status(500).json({ error: "Error de conexión al servidor LDAP" });
+    }
+
+    // Define la base de búsqueda y filtros
+    const searchBase = "ou=groups,dc=deliverar,dc=com"; // Reemplaza con tu OU
+    const searchFilter = "(objectClass=*)"; // Ajusta el filtro según tus necesidades
+
+    // Configura las opciones de búsqueda
+    const searchOptions = {
+      scope: "one", // Puedes ajustar el alcance de búsqueda (sub, base, one)
+      filter: searchFilter,
+    };
+
+    // Realiza la búsqueda en el servidor LDAP
+    ldapClient.search(searchBase, searchOptions, (searchErr, searchRes) => {
+      if (searchErr) {
+        console.error("Error al realizar la búsqueda:", searchErr);
+        ldapClient.unbind();
+        return res.status(500).json({ error: "Error de búsqueda en el servidor LDAP" });
+      }
+
+      const groups = [];
+
+      // Procesa los resultados de la búsqueda
+      searchRes.on("searchEntry", (entry) => {
+        const group = entry.pojo;
+        groups.push(group);
+      });
+
+      searchRes.on("end", () => {
+        // Cierra la conexión al servidor LDAP
+        ldapClient.unbind();
+
+        // Devuelve los grupos como JSON
+        return res.json(groups);
+      });
+    });
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
