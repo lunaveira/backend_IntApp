@@ -297,14 +297,20 @@ app.get('/api/LoginUid', async (req, res) => {
     try {
       const usuarioDN = await searchUsuariosPorUid(uid);
       console.log('DN del usuario:', usuarioDN);
-
+      const bloqueado = await estaBloqueado(usuarioDN);
+      console.log("bloqueado??: ", bloqueado)
+            if (bloqueado === '1'){
+        return res.status(500).send('Usuario Bloqueado');
+      }
       ldapClient.bind(usuarioDN, pass, (err) => {
         if (err) {
           console.error('Error de autenticación:', err);
+          incrementAndCheckStAndL(usuarioDN);
           res.status(500).send('Credenciales Inválidas');
           return;
         }
         console.log('Autenticación exitosa');
+        blanquearContador(usuarioDN);
         ldapClient.unbind();
         res.status(200).send('ok');
       });
@@ -1053,6 +1059,187 @@ function CodigoRandom() {
   const min = 100000; // Valor mínimo de 6 dígitos
   const max = 999999; // Valor máximo de 6 dígitos
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function estaBloqueado(dn){
+  return new Promise((resolve, reject) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+    if (bindErr) {
+      ldapClient.unbind(() => {
+        reject(bindErr);
+      });
+      return;
+    }
+
+    const searchOptions = {
+      scope: 'base',
+      attributes: ['l'],
+    };
+    ldapClient.search(dn, searchOptions, (searchErr, res) => {
+      if (searchErr) {
+        ldapClient.unbind(() => {
+          reject(searchErr);
+        });
+        return;
+      }
+
+      res.on('searchEntry', (entry) => {
+        console.log('PASO 1 de busqueda del l');
+        const lValue = entry.attributes.find(attr => attr.type === 'l').values[0];
+        console.log('Valor de "l": ', lValue);
+        if (lValue == '1') {
+          resolve(lValue);
+        } else{
+          resolve(null);
+        }
+      });
+      res.on('end', () => {
+        ldapClient.unbind(() => {
+        });
+      });
+    });
+  });
+    });
+};
+
+function incrementAndCheckStAndL(dn) {
+  return new Promise((resolve, reject) => {
+    const ldapServerUrl = 'ldap://34.231.51.201:389/';
+    const adminDN = 'cn=admin,dc=deliverar,dc=com';
+    const adminPassword = 'admin';
+
+    const ldapClient = ldap.createClient({
+      url: ldapServerUrl,
+    });
+
+    ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+      if (bindErr) {
+        ldapClient.unbind(() => {
+          reject(bindErr);
+        });
+        return;
+      }
+
+      const searchOptions = {
+        scope: 'base',
+        attributes: ['st'],
+      };
+      ldapClient.search(dn, searchOptions, (searchErr, res) => {
+        if (searchErr) {
+          ldapClient.unbind(() => {
+            reject(searchErr);
+          });
+          return;
+        }
+
+        res.on('searchEntry', (entry) => {
+          console.log('PASO 1');
+          const stValue = entry.attributes.find(attr => attr.type === 'st').values[0];
+          console.log('Valor de "st": ', stValue);
+          const newSt = stValue + 1;
+          console.log('St nuevo:', newSt);
+          const change = new ldap.Change({
+            operation: 'replace',
+            modification: new ldap.Attribute({
+              type: 'st',
+              values: [newSt],
+            }),
+          });          
+          // Realiza la modificación en el servidor LDAP
+          ldapClient.modify(dn, change, () => {
+            console.log("Se actualizó el contador");
+          });
+          console.log("VALOR DE NEWST: ", newSt)
+          if (newSt == '0111') {
+            console.log("PASO 3");
+            const bloqueo = "1";
+            console.log("bloqueo: ", bloqueo)
+            const lChange = new ldap.Change({
+              operation: 'replace',
+              modification: new ldap.Attribute({
+                type: 'l',
+                values: [bloqueo],
+              }),
+            });
+            console.log("PASO 4");
+            ldapClient.modify(dn, lChange, (modifyErr) => {
+              console.log("Se  bloqueó el usuario");
+              resolve("1");
+            });
+          } 
+        });
+        res.on('end', () => {
+          ldapClient.unbind(() => {
+            resolve('Operación completada con éxito.');
+          });
+        });
+      });
+    });
+  });
+}
+
+
+function blanquearContador(dn) {
+  return new Promise((resolve, reject) => {
+    const ldapServerUrl = 'ldap://34.231.51.201:389/';
+    const adminDN = 'cn=admin,dc=deliverar,dc=com';
+    const adminPassword = 'admin';
+
+    const ldapClient = ldap.createClient({
+      url: ldapServerUrl,
+    });
+
+    ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+      if (bindErr) {
+        ldapClient.unbind(() => {
+          reject(bindErr);
+        });
+        return;
+      }
+
+      const searchOptions = {
+        scope: 'base',
+        attributes: ['st'],
+      };
+      ldapClient.search(dn, searchOptions, (searchErr, res) => {
+        if (searchErr) {
+          ldapClient.unbind(() => {
+            reject(searchErr);
+          });
+          return;
+        }
+
+        res.on('searchEntry', (entry) => {
+          const newSt = 0;
+          console.log('St nuevo:', newSt);
+          const change = new ldap.Change({
+            operation: 'replace',
+            modification: new ldap.Attribute({
+              type: 'st',
+              values: [newSt],
+            }),
+          });          
+          // Realiza la modificación en el servidor LDAP
+          ldapClient.modify(dn, change, () => {
+            console.log("Se reinició el contador");
+          });
+        });
+        res.on('end', () => {
+          ldapClient.unbind(() => {
+            resolve('Operación completada con éxito.');
+          });
+        });
+      });
+    });
+  });
 }
 
 
