@@ -528,6 +528,66 @@ app.put('/api/GenerarOTP', async (req, res) => {
   });
 });
 
+
+
+
+
+app.put('/api/DesbloquearUsuario', async (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const uid = req.query.uid;
+    const givenName = req.query.name;
+    console.log(uid);
+
+    try {
+      const usuarioDN = await searchUsuariosPorUid(uid);
+      console.log('DN del usuario:', usuarioDN);
+      const change = new ldap.Change({
+        operation: 'replace',
+        modification: new ldap.Attribute({
+          type: 'l',
+          values: ["0"],
+        }),
+      });
+
+      ldapClient.modify(usuarioDN, change, (modifyError) => {
+        if (modifyError) {
+          console.error('Error al desbloquear el usuario:', modifyError);
+          // Asegúrate de manejar el error de cambio de contraseña de manera adecuada
+          res.status(500).send('Error al desbloquear el usuario');
+          return;
+        }
+        console.log('Usuario desbloqueado correctamente');
+
+        // Desconexión del servidor LDAP
+        ldapClient.unbind();
+        res.status(200).send('Usuario desbloqueado correctamente');
+      });
+    } catch (searchError) {
+      console.error('Error en la búsqueda LDAP:', searchError);
+      res.status(500).send('No se encontró el usuario en e LDAP');
+    }
+    // Configurar la modificación de la contraseña
+
+  });
+});
+
+
+
+
 app.get('/api/BuscarUsuariosPorUid', (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
@@ -761,71 +821,7 @@ app.get('/api/listar-grupos', async (req, res) => {
   }
 });
 
-/*
 
-// Ruta para obtener la lista de grupos
-app.get('/api/listar-gruposv2', async (req, res) => {
-  try {
-    const grupos = await listarGruposv2();
-    res.status(200).json(grupos);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al listar grupos' });
-  }
-});
-
-
-
-// Función para listar grupos en LDAP
-async function listarGruposv2() {
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'admin';
-
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-  });
-
-  ldapClient.bind(adminDN, adminPassword, (bindError) => {
-    if (bindError) {
-      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
-      throw bindError; // Manejar el error de autenticación
-    } else {
-      console.log('Conexión exitosa al servidor LDAP');
-    }
-
-    const baseDN = 'ou=groups,dc=deliverar,dc=com'; // Reemplaza con tu DN de grupos
-    const searchOptions = {
-      scope: 'one',
-      filter: '(objectClass=posixGroup)', // Filtro para grupos (ajusta según tu LDAP)
-    };
-
-    return new Promise((resolve, reject) => {
-      ldapClient.search(baseDN, searchOptions, (searchError, searchResponse) => {
-        if (searchError) {
-          console.error('Error en la búsqueda LDAP:', searchError);
-          ldapClient.unbind();
-          reject(searchError); // Manejar el error de búsqueda
-        }
-
-        const grupos = [];
-
-        searchResponse.on('searchEntry', (entry) => {
-          const grupo = entry.pojo;
-          grupos.push(grupo);
-        });
-
-        searchResponse.on('end', () => {
-          console.log('Búsqueda LDAP completada. Total de grupos encontrados:', grupos.length);
-          resolve(grupos);
-          ldapClient.unbind();
-
-        });
-      });
-    });
-  });
-}
-
-*/
 
 
 
