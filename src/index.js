@@ -363,7 +363,7 @@ app.get('/api/LoginUid', async (req, res) => {
       console.log('DN del usuario:', usuarioDN);
       const bloqueado = await estaBloqueado(usuarioDN);
       console.log("bloqueado??: ", bloqueado)
-            if (bloqueado === '1'){
+      if (bloqueado === '1') {
         return res.status(500).send('Usuario Bloqueado');
       }
       ldapClient.bind(usuarioDN, pass, (err) => {
@@ -875,14 +875,122 @@ async function listarGrupos() {
   });
 }
 
-// Ruta para obtener la lista de grupos
-app.get('/api/listar-grupos', async (req, res) => {
-  try {
-    const grupos = await listarGrupos();
-    res.status(200).json({ grupos });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al listar grupos' });
-  }
+// // Ruta para obtener la lista de grupos
+// app.get('/api/listar-grupos', async (req, res) => {
+//   try {
+//     const grupos = await listarGrupos();
+//     res.status(200).json({ grupos });
+//   } catch (error) {
+//     res.status(500).json({ error: 'Error al listar grupos' });
+//   }
+// });
+
+
+app.post("/api/asignar-usuarios-a-grupo", (req, res) => {
+  // Recupera los datos del usuario y del grupo desde el cuerpo de la solicitud
+  const { username, groupName } = req.body;
+  console.log("username:", username);
+  console.log("groupName:", groupName);
+
+  // Configura los detalles de conexión al servidor LDAP
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  // Conecta al servidor LDAP
+  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+    if (bindErr) {
+      console.error("Error al conectar al servidor LDAP:", bindErr);
+      return res.status(500).json({ error: "Error de conexión al servidor LDAP" });
+    }
+
+    // Define la base de búsqueda para el grupo
+    const groupDN = `cn=${groupName},ou=groups,dc=deliverar,dc=com`;
+    const userDN = `cn=${username},ou=users,dc=deliverar,dc=com`;
+    console.log("groupDN:", groupDN);
+    console.log("userDN:", userDN);
+
+    // Realiza una búsqueda para verificar si el usuario existe
+    ldapClient.search(userDN, { scope: "sub" }, (searchErr, userRes) => {
+      if (searchErr) {
+        console.error("Error al buscar el usuario:", searchErr);
+        ldapClient.unbind();
+        return res.status(500).json({ error: "Error al buscar el usuario en el servidor LDAP" });
+      }
+
+      userRes.on("searchEntry", (entry) => {
+        console.log("User Entry:", entry.object);
+        // Verifica que el usuario exista antes de continuar
+        if (entry) {
+          // Realiza una búsqueda para verificar si el grupo existe
+          ldapClient.search(groupDN, { scope: "base" }, (groupSearchErr, groupRes) => {
+            if (groupSearchErr) {
+              console.error("Error al buscar el grupo:", groupSearchErr);
+              ldapClient.unbind();
+              return res.status(500).json({ error: "Error al buscar el grupo en el servidor LDAP" });
+            }
+
+            groupRes.on("searchEntry", (groupEntry) => {
+              console.log("Group Entry:", groupEntry.object);
+              // Verifica que el grupo exista antes de continuar
+              if (groupEntry) {
+                // La propiedad 'memberUid' se refiere a los miembros actuales del grupo
+                const group = groupEntry.object;
+
+                if (group && group.memberUid) {
+                  console.log("Miembros actuales del grupo:", group.memberUid);
+
+                  // Verifica si el usuario ya es miembro del grupo
+                  if (group.memberUid.indexOf(userDN) === -1) {
+                    // Agrega al usuario al grupo
+                    group.memberUid.push(userDN);
+                    console.log("Miembros del grupo después de la adición:", group.memberUid);
+
+                    // Actualiza el grupo con el nuevo usuario
+                    ldapClient.modify(groupDN, [
+                      new ldap.Change({
+                        operation: 'replace',
+                        modification: {
+                          memberUid: group.memberUid,
+                        },
+                      }),
+                    ], (modifyErr) => {
+                      if (modifyErr) {
+                        console.error("Error al modificar el grupo:", modifyErr);
+                        ldapClient.unbind();
+                        return res.status(500).json({ error: "Error al modificar el grupo en el servidor LDAP" });
+                      }
+
+                      // Cierra la conexión al servidor LDAP
+                      ldapClient.unbind();
+
+                      return res.json({ message: `Usuario ${username} asignado al grupo ${groupName} con éxito.` });
+                    });
+                  } else {
+                    console.log(`El usuario ${username} ya es miembro del grupo ${groupName}.`);
+                    ldapClient.unbind();
+                    return res.json({ message: `Usuario ${username} ya es miembro del grupo ${groupName}.` });
+                  }
+                } else {
+                  console.error("La propiedad 'memberUid' del grupo no está definida.");
+                  ldapClient.unbind();
+                  return res.status(500).json({ error: "La propiedad 'memberUid' del grupo no está definida." });
+                }
+              }
+            });
+          });
+        } else {
+          console.error(`El usuario ${username} no existe.`);
+          ldapClient.unbind();
+          return res.status(404).json({ error: `El usuario ${username} no existe en el servidor LDAP.` });
+        }
+      });
+    });
+  });
 });
 
 
@@ -1121,53 +1229,53 @@ function CodigoRandom() {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function estaBloqueado(dn){
+function estaBloqueado(dn) {
   return new Promise((resolve, reject) => {
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'admin';
+    const ldapServerUrl = 'ldap://34.231.51.201:389/';
+    const adminDN = 'cn=admin,dc=deliverar,dc=com';
+    const adminPassword = 'admin';
 
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-  });
+    const ldapClient = ldap.createClient({
+      url: ldapServerUrl,
+    });
 
-  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
-    if (bindErr) {
-      ldapClient.unbind(() => {
-        reject(bindErr);
-      });
-      return;
-    }
-
-    const searchOptions = {
-      scope: 'base',
-      attributes: ['l'],
-    };
-    ldapClient.search(dn, searchOptions, (searchErr, res) => {
-      if (searchErr) {
+    ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+      if (bindErr) {
         ldapClient.unbind(() => {
-          reject(searchErr);
+          reject(bindErr);
         });
         return;
       }
 
-      res.on('searchEntry', (entry) => {
-        console.log('PASO 1 de busqueda del l');
-        const lValue = entry.attributes.find(attr => attr.type === 'l').values[0];
-        console.log('Valor de "l": ', lValue);
-        if (lValue == '1') {
-          resolve(lValue);
-        } else{
-          resolve(null);
+      const searchOptions = {
+        scope: 'base',
+        attributes: ['l'],
+      };
+      ldapClient.search(dn, searchOptions, (searchErr, res) => {
+        if (searchErr) {
+          ldapClient.unbind(() => {
+            reject(searchErr);
+          });
+          return;
         }
-      });
-      res.on('end', () => {
-        ldapClient.unbind(() => {
+
+        res.on('searchEntry', (entry) => {
+          console.log('PASO 1 de busqueda del l');
+          const lValue = entry.attributes.find(attr => attr.type === 'l').values[0];
+          console.log('Valor de "l": ', lValue);
+          if (lValue == '1') {
+            resolve(lValue);
+          } else {
+            resolve(null);
+          }
+        });
+        res.on('end', () => {
+          ldapClient.unbind(() => {
+          });
         });
       });
     });
   });
-    });
 };
 
 function incrementAndCheckStAndL(dn) {
@@ -1212,7 +1320,7 @@ function incrementAndCheckStAndL(dn) {
               type: 'st',
               values: [newSt],
             }),
-          });          
+          });
           // Realiza la modificación en el servidor LDAP
           ldapClient.modify(dn, change, () => {
             console.log("Se actualizó el contador");
@@ -1234,7 +1342,7 @@ function incrementAndCheckStAndL(dn) {
               console.log("Se  bloqueó el usuario");
               resolve("1");
             });
-          } 
+          }
         });
         res.on('end', () => {
           ldapClient.unbind(() => {
@@ -1286,7 +1394,7 @@ function blanquearContador(dn) {
               type: 'st',
               values: [newSt],
             }),
-          });          
+          });
           // Realiza la modificación en el servidor LDAP
           ldapClient.modify(dn, change, () => {
             console.log("Se reinició el contador");
