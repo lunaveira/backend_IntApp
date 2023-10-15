@@ -3,6 +3,10 @@ const ldap = require('ldapjs');
 const nodemailer = require("nodemailer");
 //const mysql = require('mysql');
 const app = express();
+const cors = require('cors');
+
+
+app.use(cors()); // Esto permitirá todas las solicitudes CORS
 
 app.use(express.json());
 
@@ -272,6 +276,66 @@ app.put('/api/usuarios/:cn', async (req, res) => {
     });
   });
 });
+
+
+
+
+
+
+app.get('/api/LoginUidApp', async (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+
+
+    const uid = req.query.uid;
+    const pass = req.query.pass;
+    const applicacion = req.query.app;
+    console.log(uid);
+    try {
+      const usuarioDN = await searchUsuariosPorUid(uid);
+      console.log('DN del usuario:', usuarioDN);
+      const bloqueado = await estaBloqueado(usuarioDN);
+      console.log("bloqueado??: ", bloqueado)
+            if (bloqueado === '1'){
+        return res.status(500).send('Usuario Bloqueado');
+      }
+      ldapClient.bind(usuarioDN, pass, (err) => {
+        if (err) {
+          console.error('Error de autenticación:', err);
+          incrementAndCheckStAndL(usuarioDN);
+          res.status(500).send('Credenciales Inválidas');
+          return;
+        }
+        console.log('Autenticación exitosa');
+        blanquearContador(usuarioDN);
+        ldapClient.unbind();
+        res.status(200).send('ok');
+      });
+    } catch (searchError) {
+      console.error('Error en la búsqueda LDAP:', searchError);
+      res.status(500).send('No se encontró el usuario en e LDAP');
+    }
+  });
+});
+
+
+
+
+
+
+
 
 
 app.get('/api/LoginUid', async (req, res) => {
@@ -1237,6 +1301,67 @@ function blanquearContador(dn) {
     });
   });
 }
+
+
+app.get('/api/validarGrupo', async (req, res) => {
+  try {
+    const grupoCN = req.params.cn;
+    const usuario = req.params.uid;
+    const DN = "'cn=" + grupoCN + ",ou=groups,dc=deliverar,dc=com'";
+    const grupos = UsuarioEnGrupo(DN, usuario);
+    res.status(200).json({ grupos });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al listar grupos' });
+  }
+});
+
+
+
+function UsuarioEnGrupo(groupDN, uid, callback) {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+    const adminDN = 'cn=admin,dc=deliverar,dc=com';
+    const adminPassword = 'admin';
+
+    const ldapClient = ldap.createClient({
+      url: ldapServerUrl,
+    });
+
+
+  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+    if (bindErr) {
+      ldapClient.unbind();
+      return callback(bindErr, false);
+    }
+
+    const filter = `(&(objectClass=posixGroup)(memberUid=${uid}))`;
+    const searchOptions = {
+      scope: 'sub',
+      filter,
+      attributes: ['cn'],
+    };
+
+    ldapClient.search(groupDN, searchOptions, (searchErr, searchResult) => {
+      if (searchErr) {
+        ldapClient.unbind();
+        return callback(searchErr, false);
+      }
+
+      let found = false;
+
+      searchResult.on('searchEntry', (entry) => {
+        // El usuario está en el grupo si se encuentra una entrada.
+        found = true;
+      });
+
+      searchResult.on('end', () => {
+        ldapClient.unbind(() => {
+          callback(null, found);
+        });
+      });
+    });
+  });
+}
+
 
 
 const port = process.env.port || 80
