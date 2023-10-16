@@ -4,6 +4,7 @@ const nodemailer = require("nodemailer");
 //const mysql = require('mysql');
 const app = express();
 const cors = require('cors');
+const crypto = require('crypto');
 
 
 app.use(cors()); // Esto permitirá todas las solicitudes CORS
@@ -424,6 +425,7 @@ app.get('/api/Login', (req, res) => {
   });
 });
 
+/*
 app.put('/api/ChangePassword', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
@@ -476,7 +478,62 @@ app.put('/api/ChangePassword', async (req, res) => {
   });
 });
 
+*/
 
+app.put('/api/ChangePassword', async (req, res) => {
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+    if (bindError) {
+      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+      res.status(500).send('Error al autenticarse en el servidor LDAP');
+      return;
+    }
+    const uid = req.query.uid;
+    console.log(uid);
+    const newPass = req.query.pass;
+    console.log(newPass);
+
+    // Calcular el hash MD5 de la nueva contraseña
+    const sha1Password = crypto.createHash('sha1').update(newPass).digest('base64');
+    const sha1 = "{SHA}" + sha1Password
+
+    try {
+      const usuarioDN = await searchUsuariosPorUid(uid);
+      console.log('DN del usuario:', usuarioDN);
+      const change = new ldap.Change({
+        operation: 'replace',
+        modification: new ldap.Attribute({
+          type: 'userPassword',
+          values: [sha1], // Usar el hash MD5
+        }),
+      });
+      console.log("contraseña hasheada: ", sha1)
+      ldapClient.modify(usuarioDN, change, (modifyError) => {
+        if (modifyError) {
+          console.error('Error al cambiar la contraseña:', modifyError);
+          // Asegúrate de manejar el error de cambio de contraseña de manera adecuada
+          res.status(500).send('Error al cambiar la contraseña');
+          return;
+        }
+        console.log('Contraseña cambiada exitosamente');
+
+        // Desconexión del servidor LDAP
+        ldapClient.unbind();
+        res.status(200).send('Contraseña cambiada exitosamente');
+      });
+    } catch (searchError) {
+      console.error('Error en la búsqueda LDAP:', searchError);
+      res.status(500).send('No se encontró el usuario en el LDAP');
+    }
+  });
+});
 
 app.get('/api/ValidarOTP', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
