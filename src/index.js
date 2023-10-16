@@ -987,6 +987,45 @@ app.put('/api/AgregarUsuariosGrupo', async (req, res) => {
   });
 });
 
+app.delete('/api/EliminarUsuariosGrupo', async (req, res) => {
+  // Autenticación del administrador en el servidor LDAP
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+  const grp = req.query.grupo;
+  const usuario = req.query.usr;
+  const grupoDN = 'cn=' + grp + ',ou=groups,dc=deliverar,dc=com';
+
+  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+    if (bindErr) {
+      ldapClient.unbind();
+      return res.status(401).json({ error: 'Error de autenticación LDAP' });
+    }
+
+    // Modificación para eliminar el usuario del grupo
+    const change = new ldap.Change({
+      operation: 'delete',
+      modification: new ldap.Attribute({
+        type: 'memberUid',
+        values: [usuario],
+      }),
+    });
+
+    ldapClient.modify(grupoDN, change, (modifyErr) => {
+      ldapClient.unbind();
+      if (modifyErr) {
+        return res.status(500).json({ error: 'Error al eliminar el usuario del grupo' });
+      }
+
+      res.status(200).json({ message: `Usuario '${usuario}' eliminado del grupo.` });
+    });
+  });
+});
+
 
 /*
 
