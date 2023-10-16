@@ -790,97 +790,97 @@ app.get('/api/ValidarEmail', (req, res) => {
 
 
 
-app.post('/api/usuarios/:cn/asignar-grupos', async (req, res) => {
-  const cn = req.params.cn;
-  const { groups } = req.body;
+// app.post('/api/usuarios/:cn/asignar-grupos', async (req, res) => {
+//   const cn = req.params.cn;
+//   const { groups } = req.body;
 
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'admin';
+//   const ldapServerUrl = 'ldap://34.231.51.201:389/';
+//   const adminDN = 'cn=admin,dc=deliverar,dc=com';
+//   const adminPassword = 'admin';
 
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-  });
+//   const ldapClient = ldap.createClient({
+//     url: ldapServerUrl,
+//   });
 
-  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
-    if (bindError) {
-      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
-      res.status(500).send('Error al autenticarse en el servidor LDAP');
-      return;
-    }
+//   ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+//     if (bindError) {
+//       console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+//       res.status(500).send('Error al autenticarse en el servidor LDAP');
+//       return;
+//     }
 
-    const userDN = `cn=${cn},ou=users,dc=deliverar,dc=com`;
+//     const userDN = `cn=${cn},ou=users,dc=deliverar,dc=com`;
 
-    // Recorre la lista de grupos y asigna al usuario
-    for (const groupDN of groups) {
-      ldapClient.modify(userDN, [
-        new ldap.Change({
-          operation: 'add',
-          modification: new ldap.Attribute({
-            type: 'member', // Nombre del atributo que relaciona usuarios y grupos
-            vals: [userDN], // Valor que relaciona al usuario con el grupo
-          }),
-        }),
-      ], (modifyError) => {
-        if (modifyError) {
-          console.error(`Error al asignar el usuario al grupo ${groupDN}:`, modifyError);
-        } else {
-          console.log(`Usuario asignado al grupo ${groupDN}`);
-        }
-      });
-    }
+//     // Recorre la lista de grupos y asigna al usuario
+//     for (const groupDN of groups) {
+//       ldapClient.modify(userDN, [
+//         new ldap.Change({
+//           operation: 'add',
+//           modification: new ldap.Attribute({
+//             type: 'member', // Nombre del atributo que relaciona usuarios y grupos
+//             vals: [userDN], // Valor que relaciona al usuario con el grupo
+//           }),
+//         }),
+//       ], (modifyError) => {
+//         if (modifyError) {
+//           console.error(`Error al asignar el usuario al grupo ${groupDN}:`, modifyError);
+//         } else {
+//           console.log(`Usuario asignado al grupo ${groupDN}`);
+//         }
+//       });
+//     }
 
-    console.log(`Grupos asignados al usuario ${cn}:`, groups); // Nuevo console.log agregado
+//     console.log(`Grupos asignados al usuario ${cn}:`, groups); // Nuevo console.log agregado
 
-    res.status(200).send('Grupos asignados exitosamente');
-    ldapClient.unbind();
-  });
-});
+//     res.status(200).send('Grupos asignados exitosamente');
+//     ldapClient.unbind();
+//   });
+// });
 
-app.post('/api/usuarios/:cn/desasignar-grupos', async (req, res) => {
-  const cn = req.params.cn;
-  const { groups } = req.body;
+// app.post('/api/usuarios/:cn/desasignar-grupos', async (req, res) => {
+//   const cn = req.params.cn;
+//   const { groups } = req.body;
 
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
-  const adminDN = 'cn=admin,dc=deliverar,dc=com';
-  const adminPassword = 'admin';
+//   const ldapServerUrl = 'ldap://34.231.51.201:389/';
+//   const adminDN = 'cn=admin,dc=deliverar,dc=com';
+//   const adminPassword = 'admin';
 
-  const ldapClient = ldap.createClient({
-    url: ldapServerUrl,
-  });
+//   const ldapClient = ldap.createClient({
+//     url: ldapServerUrl,
+//   });
 
-  ldapClient.bind(adminDN, adminPassword, async (bindError) => {
-    if (bindError) {
-      console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
-      res.status(500).send('Error al autenticarse en el servidor LDAP');
-      return;
-    }
+//   ldapClient.bind(adminDN, adminPassword, async (bindError) => {
+//     if (bindError) {
+//       console.error('Fallo al autenticarse en el servidor LDAP:', bindError);
+//       res.status(500).send('Error al autenticarse en el servidor LDAP');
+//       return;
+//     }
 
-    const userDN = `cn=${cn},ou=users,dc=deliverar,dc=com`;
+//     const userDN = `cn=${cn},ou=users,dc=deliverar,dc=com`;
 
-    // Recorre la lista de grupos y desasigna al usuario
-    for (const groupDN of groups) {
-      ldapClient.modify(groupDN, [
-        new ldap.Change({
-          operation: 'delete',
-          modification: new ldap.Attribute({
-            type: 'member', // Nombre del atributo que relaciona usuarios y grupos
-            vals: [userDN], // Valor que se eliminará del grupo
-          }),
-        }),
-      ], (modifyError) => {
-        if (modifyError) {
-          console.error(`Error al desasignar el usuario del grupo ${groupDN}:`, modifyError);
-        } else {
-          console.log(`Usuario desasignado del grupo ${groupDN}`);
-        }
-      });
-    }
+//     // Recorre la lista de grupos y desasigna al usuario
+//     for (const groupDN of groups) {
+//       ldapClient.modify(groupDN, [
+//         new ldap.Change({
+//           operation: 'delete',
+//           modification: new ldap.Attribute({
+//             type: 'member', // Nombre del atributo que relaciona usuarios y grupos
+//             vals: [userDN], // Valor que se eliminará del grupo
+//           }),
+//         }),
+//       ], (modifyError) => {
+//         if (modifyError) {
+//           console.error(`Error al desasignar el usuario del grupo ${groupDN}:`, modifyError);
+//         } else {
+//           console.log(`Usuario desasignado del grupo ${groupDN}`);
+//         }
+//       });
+//     }
 
-    res.status(200).send('Grupos desasignados exitosamente');
-    ldapClient.unbind();
-  });
-});
+//     res.status(200).send('Grupos desasignados exitosamente');
+//     ldapClient.unbind();
+//   });
+// });
 
 
 // Función para listar grupos en LDAP
