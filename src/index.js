@@ -719,7 +719,7 @@ app.get('/api/ValidarEmail', (req, res) => {
     const existingUsers = await searchUsuariosPorUid(nombre);
 
     if (existingUsers.length > 0) {
-      return res.status(200).json(existingUsers);
+      return res.status(200).send("1");
       /* return res.status(500).send('El usuario no existe.');*/
       /*VER QUE ES NECESARIO QUE DEVUELVA*/
 
@@ -886,6 +886,53 @@ async function listarGrupos() {
 // });
 
 
+
+app.put('/api/AgregarUsuariosGrupo', async (req, res) => {
+
+  // Autenticación del administrador en el servidor LDAP
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+  const grp = req.query.grupo;
+  const usuario = req.query.usr;
+  const grupoDN = 'cn=' + grp + ',ou=groups,dc=deliverar,dc=com';
+  console.log(usuario);
+  console.log(grupoDN);
+
+
+  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+    if (bindErr) {
+      ldapClient.unbind();
+      return res.status(401).json({ error: 'Error de autenticación LDAP' });
+    }
+
+    // Modificación para agregar el usuario al grupo
+    const change = new ldap.Change({
+      operation: 'add',
+      modification: new ldap.Attribute({
+        type: 'memberUid',
+        values: [usuario],
+      }),
+    });
+
+    ldapClient.modify(grupoDN, change, (modifyErr) => {
+      ldapClient.unbind();
+      if (modifyErr) {
+        return res.status(500).json({ error: 'Error al agregar el usuario al grupo' });
+      }
+
+      res.status(200).json({ message: `Usuario '${usuario}' agregado al grupo.` });
+    });
+  });
+});
+
+
+/*
+
 app.post("/api/asignar-usuarios-a-grupo", (req, res) => {
   // Recupera los datos del usuario y del grupo desde el cuerpo de la solicitud
   const { username, groupName } = req.body;
@@ -993,7 +1040,7 @@ app.post("/api/asignar-usuarios-a-grupo", (req, res) => {
   });
 });
 
-
+*/
 
 
 
@@ -1411,22 +1458,26 @@ function blanquearContador(dn) {
 }
 
 
-app.get('/api/validarGrupo', async (req, res) => {
-  try {
-    const grupoCN = req.params.cn;
-    const usuario = req.params.uid;
-    const DN = "'cn=" + grupoCN + ",ou=groups,dc=deliverar,dc=com'";
-    const grupos = UsuarioEnGrupo(DN, usuario);
-    res.status(200).json({ grupos });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al listar grupos' });
-  }
+app.get('/api/validarAplicacion', async (req, res) => {
+
+    const grupoCN = req.query.cn;
+    const usuario = req.query.uid;
+    const grupos = await UsuarioEnGrupo(grupoCN, usuario);
+    console.log("grupo: ",grupos)
+    
+    if (grupos === "1"){
+      res.status(200).send("pasá campeón");
+    }else{
+      res.status(500).send("no podes acceder a esta aplicación");
+    }
+
 });
 
 
 
-function UsuarioEnGrupo(groupDN, uid, callback) {
-  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+function UsuarioEnGrupo(groupCN, uid) {
+  return new Promise((resolve, reject) => {
+    const ldapServerUrl = 'ldap://34.231.51.201:389/';
     const adminDN = 'cn=admin,dc=deliverar,dc=com';
     const adminPassword = 'admin';
 
@@ -1434,36 +1485,39 @@ function UsuarioEnGrupo(groupDN, uid, callback) {
       url: ldapServerUrl,
     });
 
-
-  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
-    if (bindErr) {
-      ldapClient.unbind();
-      return callback(bindErr, false);
-    }
-
-    const filter = `(&(objectClass=posixGroup)(memberUid=${uid}))`;
-    const searchOptions = {
-      scope: 'sub',
-      filter,
-      attributes: ['cn'],
-    };
-
-    ldapClient.search(groupDN, searchOptions, (searchErr, searchResult) => {
-      if (searchErr) {
+    ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+      if (bindErr) {
         ldapClient.unbind();
-        return callback(searchErr, false);
+        reject(bindErr);
+        return;
       }
 
-      let found = false;
+      const searchOptions = {
+        scope: 'one',
+        filter: `&(cn=${groupCN})(memberUid=${uid})`,
+      };
+      console.log("filtro: ", searchOptions)
+      const baseDN = 'ou=groups,dc=deliverar,dc=com';
+      ldapClient.search(baseDN, searchOptions, (searchErr, searchResult) => {
+        if (searchErr) {
+          ldapClient.unbind();
+          reject(searchErr);
+          return;
+        }
 
-      searchResult.on('searchEntry', (entry) => {
-        // El usuario está en el grupo si se encuentra una entrada.
-        found = true;
-      });
+        searchResult.on('searchEntry', (entry) => {
+          // El usuario está en el grupo si se encuentra una entrada.
+          ldapClient.unbind(() => {
+            console.log("PASO1")
+            resolve("1");
+          });
+        });
 
-      searchResult.on('end', () => {
-        ldapClient.unbind(() => {
-          callback(null, found);
+        searchResult.on('end', () => {
+          ldapClient.unbind(() => {
+            console.log("PASO2")
+            resolve("0"); // El usuario no se encontró en el grupo
+          });
         });
       });
     });
