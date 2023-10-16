@@ -1463,10 +1463,8 @@ app.get('/api/validarAplicacion', async (req, res) => {
     const grupoCN = req.query.cn;
     const usuario = req.query.uid;
     const grupos = await UsuarioEnGrupo(grupoCN, usuario);
-    console.log("grupo: ",grupos)
-    
     if (grupos === "1"){
-      res.status(200).send("pasá campeón");
+      res.status(200).send("Puedes acceder a la aplicación");
     }else{
       res.status(500).send("no podes acceder a esta aplicación");
     }
@@ -1496,7 +1494,6 @@ function UsuarioEnGrupo(groupCN, uid) {
         scope: 'one',
         filter: `&(cn=${groupCN})(memberUid=${uid})`,
       };
-      console.log("filtro: ", searchOptions)
       const baseDN = 'ou=groups,dc=deliverar,dc=com';
       ldapClient.search(baseDN, searchOptions, (searchErr, searchResult) => {
         if (searchErr) {
@@ -1508,14 +1505,12 @@ function UsuarioEnGrupo(groupCN, uid) {
         searchResult.on('searchEntry', (entry) => {
           // El usuario está en el grupo si se encuentra una entrada.
           ldapClient.unbind(() => {
-            console.log("PASO1")
             resolve("1");
           });
         });
 
         searchResult.on('end', () => {
           ldapClient.unbind(() => {
-            console.log("PASO2")
             resolve("0"); // El usuario no se encontró en el grupo
           });
         });
