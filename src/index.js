@@ -425,7 +425,7 @@ app.get('/api/Login', (req, res) => {
   });
 });
 
-/*
+/* CHANGE PASSWORD SIN CRYPTO
 app.put('/api/ChangePassword', async (req, res) => {
   const ldapServerUrl = 'ldap://34.231.51.201:389/';
   const adminDN = 'cn=admin,dc=deliverar,dc=com';
@@ -579,7 +579,7 @@ app.get('/api/ValidarOTP', async (req, res) => {
             res.status(500).send('Error al borrar el atributo "EmployeeNumber"');
           } else {
             console.log('Atributo "EmployeeNumber" borrado exitosamente');
-            res.status(200).send('OTP IGUALES');
+            res.status(200).send('1');
           }
           ldapClient.unbind(); // Cerrar la conexión después de modificar el atributo
         });
@@ -1101,6 +1101,18 @@ app.post("/api/asignar-usuarios-a-grupo", (req, res) => {
 
 
 
+app.get('/api/validarAplicacion', async (req, res) => {
+
+  const grupoCN = req.query.cn;
+  const usuario = req.query.uid;
+  const grupos = await UsuarioEnGrupo(grupoCN, usuario);
+  if (grupos === "1"){
+    res.status(200).send("Puedes acceder a la aplicación");
+  }else{
+    res.status(500).send("no podes acceder a esta aplicación");
+  }
+
+});
 
 
 
@@ -1128,6 +1140,57 @@ app.get("/api/grupos-ldap", (req, res) => {
     const searchOptions = {
       scope: "one", // Puedes ajustar el alcance de búsqueda (sub, base, one)
       filter: searchFilter,
+    };
+
+    // Realiza la búsqueda en el servidor LDAP
+    ldapClient.search(searchBase, searchOptions, (searchErr, searchRes) => {
+      if (searchErr) {
+        console.error("Error al realizar la búsqueda:", searchErr);
+        ldapClient.unbind();
+        return res.status(500).json({ error: "Error de búsqueda en el servidor LDAP" });
+      }
+
+      const groups = [];
+
+      // Procesa los resultados de la búsqueda
+      searchRes.on("searchEntry", (entry) => {
+        const group = entry.pojo;
+        groups.push(group);
+      });
+
+      searchRes.on("end", () => {
+        // Cierra la conexión al servidor LDAP
+        ldapClient.unbind();
+
+        // Devuelve los grupos como JSON
+        return res.json(groups);
+      });
+    });
+  });
+});
+
+app.get("/api/GruposDelUsuario", (req, res) => {
+  // Configura los detalles de conexión al servidor LDAP
+  const ldapServerUrl = 'ldap://34.231.51.201:389/';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+  // Conecta al servidor LDAP
+  const uid = req.query.uid;
+  ldapClient.bind(adminDN, adminPassword, (err) => {
+    if (err) {
+      console.error("Error al conectar al servidor LDAP:", err);
+      return res.status(500).json({ error: "Error de conexión al servidor LDAP" });
+    }
+
+    // Define la base de búsqueda y filtros
+    const searchBase = "ou=groups,dc=deliverar,dc=com"; // Reemplaza con tu OU
+    const searchOptions = {
+      scope: 'one',
+      filter: `(memberUid=${uid})`,
     };
 
     // Realiza la búsqueda en el servidor LDAP
@@ -1514,19 +1577,6 @@ function blanquearContador(dn) {
   });
 }
 
-
-app.get('/api/validarAplicacion', async (req, res) => {
-
-    const grupoCN = req.query.cn;
-    const usuario = req.query.uid;
-    const grupos = await UsuarioEnGrupo(grupoCN, usuario);
-    if (grupos === "1"){
-      res.status(200).send("Puedes acceder a la aplicación");
-    }else{
-      res.status(500).send("no podes acceder a esta aplicación");
-    }
-
-});
 
 
 
