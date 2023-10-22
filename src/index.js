@@ -1,6 +1,9 @@
 const express = require('express');
 const ldap = require('ldapjs');
 const nodemailer = require("nodemailer");
+const aws = require('aws-sdk');
+aws.config.update({ region: 'us-east-1' });
+const ses = new aws.SES({ apiVersion: '2010-12-01' });
 //const mysql = require('mysql');
 const app = express();
 const cors = require('cors');
@@ -616,7 +619,7 @@ app.put('/api/GenerarOTP', async (req, res) => {
 
     try {
       const codigo = CodigoRandom();
-      sendEmail(codigo, uid, givenName).catch(console.error);
+      sendEmailSES(codigo, uid, givenName).catch(console.error);
       const usuarioDN = await searchUsuariosPorUid(uid);
       console.log('DN del usuario:', usuarioDN);
       const change = new ldap.Change({
@@ -1259,28 +1262,6 @@ app.get("/api/GruposDelUsuario", (req, res) => {
   });
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 async function searchUsuariosPorCN(cn) {
   return new Promise((resolve, reject) => {
     const ldapServerUrl = 'ldap://34.231.51.201:389/';
@@ -1326,6 +1307,63 @@ async function searchUsuariosPorCN(cn) {
   });
 }
 
+
+
+async function sendEmailSES(otp, uid, givenName) {
+  const params = {
+    Destination: {
+      ToAddresses: [uid], // La dirección de correo del destinatario
+    },
+    Message: {
+      Body: {
+        Html: {
+          Data: `
+            <html>
+              <head>
+                <style>
+                  .header {
+                    background-color: #0073e6;
+                    color: #ffffff;
+                    padding: 10px;
+                    text-align: center;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <h1>Deliverar</h1>
+                </div>
+                <p>Estimado/a ${givenName},</p>
+                <p>Le informamos que hemos recibido una solicitud de cambio de contraseña para su cuenta en Deliverar.</p>
+                <p>Si usted no ha solicitado este cambio, por favor póngase en contacto con nuestro servicio de asistencia técnica.</p>
+                <p>Para continuar con el proceso de cambio de contraseña, utilice el siguiente código OTP: <strong>${otp}</strong></p>
+                <p>Gracias por confiar en Deliverar.</p>
+                <p>Atentamente,<br>El Equipo de Soporte de Deliverar</p>
+              </body>
+            </html>
+          `,
+        },
+      },
+      Subject: {
+        Data: 'Deliverar', // Asunto del correo
+      },
+    },
+    Source: 'ldapdeliverar@proton.me', // La dirección de correo del remitente
+  };
+
+  try {
+    const data = await ses.sendEmail(params).promise();
+    console.log('Correo electrónico enviado con éxito. ID del mensaje:', data.MessageId);
+  } catch (err) {
+    console.error('Error al enviar el correo electrónico:', err);
+  }
+}
+
+
+
+
+
+
 async function sendEmail(otp, uid, givenName) {
   // Configura el transporte de correo con Ethereal
   const testAccount = await nodemailer.createTestAccount();
@@ -1348,10 +1386,10 @@ async function sendEmail(otp, uid, givenName) {
     <html>
       <head>
         <style>
-          /* Estilos para el branding */
+          /* Estilos para el branding 
           .header {
-            background-color: #0073e6; /* Azul */
-            color: #ffffff; /* Blanco */
+            background-color: #0073e6;
+            color: #ffffff; 
             padding: 10px;
             text-align: center;
           }
@@ -1377,6 +1415,8 @@ async function sendEmail(otp, uid, givenName) {
 
   console.log("Correo electrónico enviado con éxito. URL de vista previa:", nodemailer.getTestMessageUrl(info));
 }
+
+
 
 function searchUsuariosPorUid(uid) {
   return new Promise((resolve, reject) => {
@@ -1434,6 +1474,7 @@ function CodigoRandom() {
   const max = 999999; // Valor máximo de 6 dígitos
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
 
 function estaBloqueado(dn) {
   return new Promise((resolve, reject) => {
