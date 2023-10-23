@@ -1,13 +1,11 @@
 const express = require('express');
 const ldap = require('ldapjs');
 const nodemailer = require("nodemailer");
-const aws = require('aws-sdk');
-aws.config.update({ region: 'us-east-1' });
-const ses = new aws.SES({ apiVersion: '2010-12-01' });
 //const mysql = require('mysql');
 const app = express();
 const cors = require('cors');
 const crypto = require('crypto');
+const brevo = require('@getbrevo/brevo');
 
 
 app.use(cors()); // Esto permitirá todas las solicitudes CORS
@@ -619,7 +617,7 @@ app.put('/api/GenerarOTP', async (req, res) => {
 
     try {
       const codigo = CodigoRandom();
-      sendEmailSES(codigo, uid, givenName).catch(console.error);
+      sendEmailBrevo(codigo, uid, givenName).catch(console.error);
       const usuarioDN = await searchUsuariosPorUid(uid);
       console.log('DN del usuario:', usuarioDN);
       const change = new ldap.Change({
@@ -1309,57 +1307,68 @@ async function searchUsuariosPorCN(cn) {
 
 
 
-async function sendEmailSES(otp, uid, givenName) {
-  const params = {
-    Destination: {
-      ToAddresses: [uid], // La dirección de correo del destinatario
-    },
-    Message: {
-      Body: {
-        Html: {
-          Data: `
-            <html>
-              <head>
-                <style>
-                  .header {
-                    background-color: #0073e6;
-                    color: #ffffff;
-                    padding: 10px;
-                    text-align: center;
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="header">
-                  <h1>Deliverar</h1>
-                </div>
-                <p>Estimado/a ${givenName},</p>
-                <p>Le informamos que hemos recibido una solicitud de cambio de contraseña para su cuenta en Deliverar.</p>
-                <p>Si usted no ha solicitado este cambio, por favor póngase en contacto con nuestro servicio de asistencia técnica.</p>
-                <p>Para continuar con el proceso de cambio de contraseña, utilice el siguiente código OTP: <strong>${otp}</strong></p>
-                <p>Gracias por confiar en Deliverar.</p>
-                <p>Atentamente,<br>El Equipo de Soporte de Deliverar</p>
-              </body>
-            </html>
-          `,
-        },
-      },
-      Subject: {
-        Data: 'Deliverar', // Asunto del correo
-      },
-    },
-    Source: 'ldapdeliverar@proton.me', // La dirección de correo del remitente
-  };
+async function sendEmailBrevo(otp, uid, givenName) {
+
+  let defaultClient = brevo.ApiClient.instance;
+  let apiKey = defaultClient.authentications['api-key'];
+  apiKey.apiKey = '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';
+  const apiInstance = new brevo.TransactionalEmailsApi();
+  const sendSmtpEmail = new brevo.SendSmtpEmail();
+
+  // Configurar el correo electrónico (puedes personalizarlo según tus necesidades)
+  sendSmtpEmail.subject = "Deliverar - código de validación";
+  sendSmtpEmail.htmlContent = `
+  <html>
+    <head>
+      <style>
+        /* Estilos para el branding 
+        .header {
+          background-color: #0073e6;
+          color: #ffffff; 
+          padding: 10px;
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Deliverar</h1>
+      </div>
+      <p>Estimado/a ${givenName},</p>
+      <p>Le informamos que hemos recibido una solicitud de cambio de contraseña para su cuenta en Deliverar.</p>
+      <p>Si usted no ha solicitado este cambio, por favor póngase en contacto con nuestro servicio de asistencia técnica.</p>
+      <p>Para continuar con el proceso de cambio de contraseña, utilice el siguiente código OTP: <strong>${otp}</strong></p>
+      <p>Gracias por confiar en Deliverar.</p>
+      <p>Atentamente,<br>El Equipo de Soporte de Deliverar</p>
+    </body>
+  </html>
+`;
+  sendSmtpEmail.sender = {"name":"DeliverarLDAP","email":"abmpersonalinternodeliverar@gmail.com"};
+  sendSmtpEmail.to = [
+    { "email": uid, "name": "sample-name" }
+  ];
+  sendSmtpEmail.headers = { "Some-Custom-Name": "unique-id-1234" };
+  sendSmtpEmail.params = { "parameter": "My param value", "subject": "common subject" };
 
   try {
-    const data = await ses.sendEmail(params).promise();
-    console.log('Correo electrónico enviado con éxito. ID del mensaje:', data.MessageId);
-  } catch (err) {
-    console.error('Error al enviar el correo electrónico:', err);
+    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    console.log('API called successfully. Returned data: ' + JSON.stringify(data));
+    return data;
+  } catch (error) {
+    console.error(error);
+    throw new Error('Error al enviar el correo electrónico');
   }
 }
 
-
+// Ruta para enviar correos electrónicos
+app.post('/sendEmail', async (req, res) => {
+  try {
+    const result = await sendEmail();
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 
 
