@@ -1311,7 +1311,7 @@ async function sendEmailBrevo(otp, uid, givenName) {
 
   let defaultClient = brevo.ApiClient.instance;
   let apiKey = defaultClient.authentications['api-key'];
-  apiKey.apiKey = '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';
+  apiKey.apiKey = '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';  
   const apiInstance = new brevo.TransactionalEmailsApi();
   const sendSmtpEmail = new brevo.SendSmtpEmail();
 
