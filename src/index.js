@@ -310,7 +310,7 @@ app.get('/api/LoginUidApp', async (req, res) => {
       console.log('DN del usuario:', usuarioDN);
       const bloqueado = await estaBloqueado(usuarioDN);
       console.log("bloqueado??: ", bloqueado)
-            if (bloqueado === '1'){
+      if (bloqueado === '1') {
         return res.status(500).send('Usuario Bloqueado');
       }
       ldapClient.bind(usuarioDN, pass, (err) => {
@@ -1146,9 +1146,9 @@ app.get('/api/validarAplicacion', async (req, res) => {
   const grupoCN = req.query.cn;
   const usuario = req.query.uid;
   const grupos = await UsuarioEnGrupo(grupoCN, usuario);
-  if (grupos === "1"){
+  if (grupos === "1") {
     res.status(200).send("Puedes acceder a la aplicación");
-  }else{
+  } else {
     res.status(500).send("no podes acceder a esta aplicación");
   }
 
@@ -1208,6 +1208,111 @@ app.get("/api/grupos-ldap", (req, res) => {
     });
   });
 });
+
+app.get("/api/usuarios-de-grupo/:groupName", (req, res) => {
+  const groupName = req.params.groupName;
+
+  // Configuración de conexión al servidor LDAP
+  const ldap = require('ldapjs');
+  const ldapServerUrl = 'ldap://34.231.51.201:389';
+  const adminDN = 'cn=admin,dc=deliverar,dc=com';
+  const adminPassword = 'admin';
+  const searchBase = 'ou=groups,dc=deliverar,dc=com'; // Ajusta la base según tu estructura LDAP
+
+  // Crea un cliente LDAP
+  const ldapClient = ldap.createClient({
+    url: ldapServerUrl,
+  });
+
+  // Autenticación del cliente
+  ldapClient.bind(adminDN, adminPassword, (bindErr) => {
+    if (bindErr) {
+      console.error("Error al autenticar el cliente LDAP:", bindErr);
+      return res.status(500).json({ error: "Error de autenticación al servidor LDAP" });
+    }
+
+    console.log("Cliente LDAP autenticado correctamente.");
+
+    // Filtro para buscar el grupo específico
+    const searchFilter = `(cn=${groupName})`;
+
+    // Configura las opciones de búsqueda
+    const searchOptions = {
+      scope: "sub", // Ajusta el alcance de búsqueda según tu estructura LDAP
+      filter: searchFilter,
+    };
+
+    console.log("Realizando búsqueda en el servidor LDAP...");
+
+    // Realiza la búsqueda en el servidor LDAP para obtener el grupo
+    ldapClient.search(searchBase, searchOptions, (searchErr, searchRes) => {
+      if (searchErr) {
+        console.error("Error al realizar la búsqueda en el servidor LDAP:", searchErr);
+        ldapClient.unbind();
+        return res.status(500).json({ error: "Error de búsqueda en el servidor LDAP" });
+      }
+
+      let groupMembers = [];
+
+      // Procesa los resultados de la búsqueda para obtener los miembros del grupo
+      searchRes.on("searchEntry", (entry) => {
+        const groupEntry = entry.object;
+        groupMembers = groupEntry.memberUid || [];
+      });
+
+      searchRes.on("end", () => {
+        if (groupMembers.length === 0) {
+          console.log("No se encontraron miembros en el grupo.");
+          ldapClient.unbind();
+          return res.json([]); // Devuelve una lista vacía si no hay miembros en el grupo.
+        }
+
+        console.log(`Miembros encontrados en el grupo "${groupName}":`, groupMembers);
+
+        // Ahora, construye un filtro de búsqueda para los miembros del grupo
+        const userSearchFilter = `(|${groupMembers.map((userName) => `(uid=${userName})`).join('')})`;
+
+        const userSearchOptions = {
+          scope: "sub", // Ajusta el alcance de búsqueda según tu estructura LDAP
+          filter: userSearchFilter,
+        };
+
+        // Realiza una nueva búsqueda para obtener los usuarios que son miembros del grupo
+        ldapClient.search(searchBase, userSearchOptions, (userSearchErr, userSearchRes) => {
+          if (userSearchErr) {
+            console.error("Error al buscar usuarios del grupo:", userSearchErr);
+            ldapClient.unbind();
+            return res.status(500).json({ error: "Error al buscar usuarios del grupo" });
+          }
+
+          const users = [];
+
+          // Procesa los resultados de la búsqueda de usuarios
+          userSearchRes.on("searchEntry", (userEntry) => {
+            const user = userEntry.object;
+            users.push(user);
+          });
+
+          userSearchRes.on("end", () => {
+            // Cierra la conexión al servidor LDAP
+            ldapClient.unbind();
+
+            console.log("Búsqueda en el servidor LDAP finalizada. Usuarios encontrados:", users.length);
+
+            // Devuelve los usuarios como JSON
+            return res.json(users);
+          });
+        });
+      });
+    });
+  });
+});
+
+
+
+
+
+
 
 app.get("/api/GruposDelUsuario", (req, res) => {
   // Configura los detalles de conexión al servidor LDAP
@@ -1311,7 +1416,7 @@ async function sendEmailBrevo(otp, uid, givenName) {
 
   let defaultClient = brevo.ApiClient.instance;
   let apiKey = defaultClient.authentications['api-key'];
-  apiKey.apiKey = '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';  
+  apiKey.apiKey = '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';
   const apiInstance = new brevo.TransactionalEmailsApi();
   const sendSmtpEmail = new brevo.SendSmtpEmail();
 
@@ -1343,7 +1448,7 @@ async function sendEmailBrevo(otp, uid, givenName) {
     </body>
   </html>
 `;
-  sendSmtpEmail.sender = {"name":"DeliverarLDAP","email":"abmpersonalinternodeliverar@gmail.com"};
+  sendSmtpEmail.sender = { "name": "DeliverarLDAP", "email": "abmpersonalinternodeliverar@gmail.com" };
   sendSmtpEmail.to = [
     { "email": uid, "name": "sample-name" }
   ];
