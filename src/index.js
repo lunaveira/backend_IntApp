@@ -1209,6 +1209,72 @@ app.get("/api/grupos-ldap", (req, res) => {
   });
 });
 
+app.get("/api/miembrosGrupo", (req, res) => {
+   // Configura los detalles de conexión al servidor LDAP
+   const ldapServerUrl = 'ldap://34.231.51.201:389/';
+   const adminDN = 'cn=admin,dc=deliverar,dc=com';
+   const adminPassword = 'admin';
+ 
+   const ldapClient = ldap.createClient({
+     url: ldapServerUrl,
+   });
+   
+   // Reemplaza "nombreDelGrupo" con el valor real del grupo que deseas buscar
+   const cn = req.query.cn; 
+ 
+   // Conecta al servidor LDAP
+   ldapClient.bind(adminDN, adminPassword, (err) => {
+     if (err) {
+       console.error("Error al conectar al servidor LDAP:", err);
+       return res.status(500).json({ error: "Error de conexión al servidor LDAP" });
+     }
+ 
+     // Define la base de búsqueda y filtros
+     const searchBase = "ou=groups,dc=deliverar,dc=com"; // Reemplaza con tu OU
+     const searchFilter = `(cn=${cn})`; // Ajusta el filtro según tus necesidades
+ 
+     // Configura las opciones de búsqueda
+     const searchOptions = {
+       scope: "one", // Búsqueda de alcance "base" para obtener detalles específicos del grupo
+       filter: searchFilter,
+     };
+     let miembros = [];
+ 
+     // Realiza la búsqueda en el servidor LDAP
+     ldapClient.search(searchBase, searchOptions, (searchErr, searchRes) => {
+       if (searchErr) {
+         console.error("Error al realizar la búsqueda:", searchErr);
+         ldapClient.unbind();
+         return res.status(500).json({ error: "Error de búsqueda en el servidor LDAP" });
+       }
+       const groups = [];
+
+       // Procesa los resultados de la búsqueda
+       searchRes.on("searchEntry", (entry) => {
+        const miembrosAttribute = entry.attributes.find(attr => attr.type === 'memberUid');
+        if (miembrosAttribute) {
+          const miembrosValues = miembrosAttribute.values;
+          miembros = miembros.concat(miembrosValues);
+        }
+    //    const miembros = entry.attributes.find(attr => attr.type === 'memberUid').values;
+     //   console.log('Valor de "miembros": ', miembros);
+    //     const group = entry.pojo;
+      //   groups.push(group);
+       });
+ 
+       searchRes.on("end", () => {
+         // Cierra la conexión al servidor LDAP
+         ldapClient.unbind();
+ 
+         // Devuelve los grupos como JSON
+         return res.json({ miembros });
+       });
+     });
+   });
+ });
+
+
+
 app.get("/api/usuarios-de-grupo/:groupName", (req, res) => {
   const groupName = req.params.groupName;
 
