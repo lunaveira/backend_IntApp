@@ -1622,11 +1622,17 @@ function estaBloqueado(dn) {
 
         res.on('searchEntry', (entry) => {
           console.log('PASO 1 de busqueda del l');
-          const lValue = entry.attributes.find(attr => attr.type === 'l').values[0];
-          console.log('Valor de "l": ', lValue);
-          if (lValue == '1') {
-            resolve(lValue);
+          const lAttribute = entry.attributes.find(attr => attr.type === 'l');
+          if (lAttribute && lAttribute.values && lAttribute.values.length > 0) {
+            const lValue = lAttribute.values[0];
+            console.log('Valor de "l": ', lValue);
+            if (lValue === '1') {
+              resolve(lValue);
+            } else {
+              resolve(null);
+            }
           } else {
+            // Manejar el caso en el que no se encuentra el atributo 'l' o está vacío
             resolve(null);
           }
         });
